@@ -1,10 +1,61 @@
 # Matplotlib is used in the tests but it might be unfair to require it for regular users
 import matplotlib.pyplot as plt
 from shapely.geometry import *
+import unittest
+
+class TestProfiler(unittest.TestCase):
+    def test_profiler(self):
+        """
+        Test the singleton. If it's not the same object nothing else matters
+        """
+
+    def test_different_subnets(self):
+        """
+        :return:
+        """
+        self.assertTrue(False)
+
+    def test_wrong_direction(self):
+        """
+        :return:
+        """
+        self.assertTrue(False)
+
+    def test_start_id_not_found(self):
+        """
+        :return:
+        """
+        self.assertTrue(False)
+
+    def test_end_id_not_found(self):
+        """
+        :return:
+        """
+        self.assertTrue(False)
+
+
+    def test_shapefileLoad(self):
+
+        from rivernetworkengine.util.shapefiles import Shapefile
+        shapefile = Shapefile("/Users/work/Projects/RiverScapes/pyGNAT/shapefiles/FullNetwork.shp")
+        feature = shapefile.getFeature(2001)
+        self.assertTrue(False)
+
+
+    def test_playground(self):
+        from profiler import Profile
+        pf = Profile("/Users/work/Projects/RiverScapes/pyGNAT/shapefiles/FullNetwork.shp", 2001)
 
 
 
 def thing(shortestpath, startid, endid):
+    """
+
+    :param shortestpath:
+    :param startid:
+    :param endid:
+    :return:
+    """
     # This just helps us plot our geo graph. It's kind of ahack
     # pos = {v: v for k, v in enumerate(G.nodes())}
     #
@@ -34,3 +85,4 @@ def thing(shortestpath, startid, endid):
     # plt.plot(px, py)
     #
     # plt.show()
+

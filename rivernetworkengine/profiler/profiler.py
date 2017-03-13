@@ -1,68 +1,107 @@
 from rivernetworkengine import Logger
+from rivernetworkengine.util.shapefiles import Shapefile
 import csv
+from os import path
 import networkx as nx
 
-def main(shpfile, csvfile, idfield, csvattribs, inID, outID=None):
 
-    """
-    Profile a network from startID to endID
-    :param shpfile:
-    :param csvfile:
-    :param csvattribs:
-    :param inID: The input ID
-    :param outID: (Optional) If specified will be
-    :return:
-    """
-    G = nx.read_shp('../../shapefiles/FullNetwork.shp', simplify=True)
+class Profile():
 
-    log = Logger("Main")
+    def __init__(self, shpfile, inID, outID=None):
+        """
+        Profile a network from startID to endID
+        """
+        log = Logger("Main")
 
-    start = findnodewithID(inID)
-    end = findnodewithID(outID)
+        # We need to open the shapefile first:
+        log.info("Opening shapefile...")
+        shape = Shapefile(shpfile)
 
-    # Make a depth-first tree from the first headwater we find
-    try:
-        shortestpath = nx.shortest_path(G, source=start[0], target=end[0])
-        path_edges = zip(shortestpath, shortestpath[1:])
-    except:
-        print "Path found between these two points"
-        exit(0)
+        # Parse the network
+        try:
+            log.info("parsing shapefile into network...")
+            G = nx.read_shp(shpfile, simplify=True)
+            log.info("Shapefile successfully parsed into directed network")
+        except Exception as e:
+            log.error("Error parsing network", e)
+        log = Logger("Main")
+
+        startNode = self.findnodewithID(G, inID, shape.getIDField())
+
+        assert startNode, "Could not find start ID: {} in network.".format(inID)
+
+        if outID:
+            end = self.findnodewithID(G, outID, shape.getIDField())
+            assert startNode, "Could not find end ID: {} in network.".format(outID)
+            # Make a depth-first tree from the first headwater we find
+            try:
+                shortestpath = nx.shortest_path(G, source=startNode[0], target=end[0])
+                path_edges = zip(shortestpath, shortestpath[1:])
+            except Exception, e:
+                log.error("Path not found between these two points with id: '{}' and '{}'".format(inID, outID))
+                raise e
+        else:
+            try:
+                path_edges = list(nx.dfs_edges(G, startNode[0]))
+            except Exception, e:
+                log.error("Path not found between input point with ID: {} and outflow point".format(inID, outID))
+
+        # Make a list of edges
+        outList = []
+        for edge in path_edges:
+            attrDic = G.get_edge_data(*edge)
+            shapelyObj = shape.featureToShapely(attrDic[shape.getIDField()])
+            attrDic['calc_len'] = shapelyObj['geometry'].length
+            outList.append(attrDic)
 
 
-# Could not find because those points are in two different subnetworks. Please fix your network
-# Could not find because stream flow was a problem. If you reverse your input and output then it works
-# StartID does not exist
-# EndID does not exist
+        # Now let's calculate us some distances
 
+        return outList
 
-
-
-def findnodewithID(G, id):
-    """
-    One line helper function to find a node with a given ID
-    :param id:
-    :return:
-    """
-    Logger("FindWithID")
-    id = next(iter([e for e in G.edges_iter() if G.get_edge_data(*e)['OBJECTID'] == id]), None)
-    return id
-
-def summarizeAttrib(path_edges, GG, attrib):
-    """
-    Here's us summing all of the attrib ('Shape_Leng' in this case)
-    :param path_edges:
-    :param GG:
-    :return:
-    """
-    Logger("SummAttrib")
-    x = []
-    counter = 0
-    for pe in path_edges:
-        counter += GG.get_edge_data(*pe)[attrib]
-        x.append(counter)
-    y = [(t[0][1] + t[0][0]) for t in path_edges]
-    return x, y
+        # Could not find because those points are in two different subnetworks. Please fix your network
+        # Could not find because stream flow was a problem. If you reverse your input and output then it works
 
 
 
 
+    def findnodewithID(self, G, id, idField):
+        """
+        One line helper function to find a node with a given ID
+        :param id:
+        :return:
+        """
+        Logger("FindWithID")
+        return next(iter([e for e in G.edges_iter() if G.get_edge_data(*e)[idField] == id]), None)
+
+    def summarizeAttrib(self, G, attrlist, shortpath, csv):
+        """
+        Here's us summing all of the attrib ('Shape_Leng' in this case)
+        :param path_edges:
+        :param GG:
+        :return:
+        """
+        Logger("SummAttrib")
+        x = []
+        counter = 0
+        for pe in shortpath:
+            counter += G.get_edge_data(*pe)[attrlist]
+            x.append(counter)
+        y = [(t[0][1] + t[0][0]) for t in shortpath]
+        writeCSV(y, csv)
+
+
+    def writeCSV(self, outdict, filename):
+        """
+        Separate out the writer so we can test without writing files
+        :param outdict:
+        :param csv:
+        :return:
+        """
+
+        with open(filename, 'wb') as csv_file:
+
+            writer = csv.writer(csv_file)
+            writer.we
+            for key, value in outdict.items():
+               writer.writerow([key, value])
