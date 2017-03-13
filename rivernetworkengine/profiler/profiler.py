@@ -10,6 +10,12 @@ class Profile():
     def __init__(self, shpfile, inID, outID=None):
         """
         Profile a network from startID to endID
+
+        If no outID is specified we go and found the outflow point and use that
+
+        :param shpfile: The Shape file to open
+        :param inID:  The ID of the input network segment
+        :param outID:  The ID of the output network segment (Optional) Default is none
         """
         log = Logger("Main")
 
@@ -28,14 +34,16 @@ class Profile():
 
         startNode = self.findnodewithID(G, inID, shape.getIDField())
 
-        assert startNode, "Could not find start ID: {} in network.".format(inID)
+        if not startNode:
+            raise Exception("Could not find start ID: {} in network.".format(inID))
 
         if outID:
-            end = self.findnodewithID(G, outID, shape.getIDField())
-            assert startNode, "Could not find end ID: {} in network.".format(outID)
+            endNode = self.findnodewithID(G, outID, shape.getIDField())
+            if not endNode:
+                raise Exception("Could not find end ID: {} in network.".format(outID))
             # Make a depth-first tree from the first headwater we find
             try:
-                shortestpath = nx.shortest_path(G, source=startNode[0], target=end[0])
+                shortestpath = nx.shortest_path(G, source=startNode[0], target=endNode[1])
                 path_edges = zip(shortestpath, shortestpath[1:])
             except Exception, e:
                 log.error("Path not found between these two points with id: '{}' and '{}'".format(inID, outID))
@@ -44,14 +52,24 @@ class Profile():
             try:
                 path_edges = list(nx.dfs_edges(G, startNode[0]))
             except Exception, e:
-                log.error("Path not found between input point with ID: {} and outflow point".format(inID, outID))
+                log.error("Path not found between input point with ID: {} and outflow point".format(inID))
 
-        # Make a list of edges
+
         outList = []
+        cummulativelength = 0
         for edge in path_edges:
-            attrDic = G.get_edge_data(*edge)
-            shapelyObj = shape.featureToShapely(attrDic[shape.getIDField()])
-            attrDic['calc_len'] = shapelyObj['geometry'].length
+            # Get the ID for this edge
+            shapeID = G.get_edge_data(*edge)[shape.getIDField()]
+
+            shapelyObj = shape.featureToShapely(shapeID)
+            # NetworkX stores the fields in attribute tables but we retrieve them from the shapefile directly
+            # to remain consistent
+            attrDic = shapelyObj['fields']
+
+            # Calculate length and cummulative length
+            attrDic['ProfileCalculatedLength'] = shapelyObj['geometry'].length
+            cummulativelength += attrDic['ProfileCalculatedLength']
+            attrDic['ProfileCummulativeLength'] = cummulativelength
             outList.append(attrDic)
 
 

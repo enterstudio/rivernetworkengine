@@ -67,12 +67,13 @@ class Shapefile:
     def getFeatures(self):
         self.features = {}
         for feat in self.layer:
-            self.features[feat.GetFID()] = feat
+            # NB: OGR Fields are always 0 indexed. This is ANNOYING!!!!
+            self.features[feat.GetFID() + 1] = feat
 
     def getFeature(self, id):
         feat = None
         # NB: OGR Fields are always 0 indexed. This is ANNOYING!!!!
-        id += 1
+        # id += 1
         if id in self.features:
             feat = json.loads(self.features[id].ExportToJson())
         return feat
@@ -80,6 +81,8 @@ class Shapefile:
     def featureToShapely(self, fID):
         sobj = None
         if fID in self.features:
+            # NB: OGR Fields are always 0 indexed. This is ANNOYING!!!!
+            # fID -= 1
             feat = self.features[fID]
             featobj = json.loads(feat.ExportToJson())
 
